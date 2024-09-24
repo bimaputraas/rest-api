@@ -35,12 +35,12 @@ func ParseError(err error) (Error, bool) {
 	return r, true
 }
 
-func Code(err error) (Type, bool) {
+func Code(err error) Type {
 	parsed, ok := ParseError(err)
 	if !ok {
-		return 0, false
+		return 0
 	}
-	return parsed.Code(), true
+	return parsed.Code()
 }
 
 func InvalidArgument(err error) error {

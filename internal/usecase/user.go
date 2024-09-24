@@ -10,7 +10,6 @@ import (
 	pkgjwt "github.com/bimaputraas/rest-api/pkg/jwt"
 	pkgvalidate "github.com/bimaputraas/rest-api/pkg/validate"
 	"github.com/golang-jwt/jwt/v5"
-	"net/http"
 	"time"
 )
 
@@ -32,7 +31,9 @@ func (u *Usecase) Register(ctx context.Context, user model.User) (model.User, er
 
 	uCheck, err := u.repo.GetUserByPhone(ctx, user.PhoneNumber)
 	if err != nil {
-		return model.User{}, err
+		if pkgerrors.Code(err) != pkgerrors.ErrNotFound {
+			return model.User{}, err
+		}
 	}
 
 	if uCheck.PhoneNumber == user.PhoneNumber {
@@ -58,7 +59,6 @@ func (u *Usecase) Register(ctx context.Context, user model.User) (model.User, er
 	if err != nil {
 		return model.User{}, err
 	}
-
 	data, err := txRepo.InsertUser(ctx, user)
 	if err != nil {
 		errRB := txRepo.Rollback()
@@ -69,7 +69,7 @@ func (u *Usecase) Register(ctx context.Context, user model.User) (model.User, er
 	}
 
 	err = txRepo.InsertBalance(ctx, model.Balance{
-		UserID: user.ID,
+		UserID: data.ID,
 	})
 
 	if err != nil {
@@ -105,8 +105,7 @@ func (u *Usecase) Login(ctx context.Context, login Login) (LoginResult, error) {
 
 	user, err := u.repo.GetUserByPhone(ctx, login.PhoneNumber)
 	if err != nil {
-		code, _ := pkgerrors.Code(err)
-		if code == http.StatusNotFound {
+		if pkgerrors.Code(err) == pkgerrors.ErrNotFound {
 			return LoginResult{}, pkgerrors.InvalidArgument(fmt.Errorf("invalid phone or pin"))
 		}
 		return LoginResult{}, err
@@ -145,8 +144,7 @@ func (usecase *Usecase) Auth(ctx context.Context, token string) (uint, error) {
 
 	user, err := usecase.repo.GetUserById(ctx, uint(userId))
 	if err != nil {
-		code, _ := pkgerrors.Code(err)
-		if code == http.StatusNotFound {
+		if pkgerrors.Code(err) == pkgerrors.ErrNotFound {
 			return 0, pkgerrors.Illegal(fmt.Errorf("unauthenticated"))
 		}
 		return 0, pkgerrors.Internal(err)

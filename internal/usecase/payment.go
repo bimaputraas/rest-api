@@ -74,9 +74,9 @@ func (u *Usecase) Payment(ctx context.Context, userId uint, payment Payment) (mo
 
 	transaction := model.Transaction{
 		UserID:        userId,
-		PaymentId:     data.ID,
+		PaymentId:     &data.ID,
 		Amount:        data.Amount,
-		Remarks:       "",
+		Remarks:       data.Remarks,
 		BalanceBefore: data.BalanceBefore,
 		BalanceAfter:  data.BalanceAfter,
 		Status:        "SUCCESS",

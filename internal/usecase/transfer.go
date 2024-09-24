@@ -21,10 +21,19 @@ func (u *Usecase) Transfer(ctx context.Context, userId uint, transfer Transfer) 
 	if err := pkgvalidate.Struct(transfer); err != nil {
 		return model.Transfer{}, pkgerrors.InvalidArgument(err)
 	}
+
 	remarks := transfer.Remarks
 	amount := transfer.Amount
 	targetUid := transfer.TargetUser
 	now := time.Now().Format(time.DateTime)
+
+	_, err := u.repo.GetUserById(ctx, targetUid)
+	if pkgerrors.Code(err) == pkgerrors.ErrNotFound {
+		return model.Transfer{}, pkgerrors.InvalidArgument(fmt.Errorf("target user is not exist"))
+	}
+	if err != nil {
+		return model.Transfer{}, pkgerrors.Internal(err)
+	}
 
 	if amount < 1 {
 		return model.Transfer{}, pkgerrors.InvalidArgument(fmt.Errorf("invalid amount"))
@@ -94,9 +103,9 @@ func (u *Usecase) Transfer(ctx context.Context, userId uint, transfer Transfer) 
 
 	transaction := model.Transaction{
 		UserID:        userId,
-		TransferId:    data.ID,
+		TransferId:    &data.ID,
 		Amount:        data.Amount,
-		Remarks:       "",
+		Remarks:       data.Remarks,
 		BalanceBefore: data.BalanceBefore,
 		BalanceAfter:  data.BalanceAfter,
 		Status:        "SUCCESS",

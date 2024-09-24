@@ -3,6 +3,7 @@ package mysql
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/bimaputraas/rest-api/internal/model"
 	"github.com/bimaputraas/rest-api/internal/repository"
 	pkgerrors "github.com/bimaputraas/rest-api/pkg/errors"
@@ -78,6 +79,7 @@ func (r *repo) InsertUser(ctx context.Context, user model.User) (model.User, err
 }
 
 func (r *repo) InsertBalance(ctx context.Context, balance model.Balance) error {
+	fmt.Println("balance", balance)
 	result := r.DB.Create(&balance)
 	return result.Error
 }

@@ -56,9 +56,9 @@ func (u *Usecase) TopUp(ctx context.Context, userId uint, amountTopUp float64) (
 
 	transaction := model.Transaction{
 		UserID:        userId,
-		TopUpId:       data.ID,
+		TopUpId:       &data.ID,
 		Amount:        data.AmountTopUp,
-		Remarks:       "",
+		Remarks:       "Top Up",
 		BalanceBefore: data.BalanceBefore,
 		BalanceAfter:  data.BalanceAfter,
 		Status:        "SUCCESS",
