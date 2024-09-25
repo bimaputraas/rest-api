@@ -6,6 +6,7 @@ import (
 	"github.com/bimaputraas/rest-api/internal/model"
 	pkgerrors "github.com/bimaputraas/rest-api/pkg/errors"
 	pkgvalidate "github.com/bimaputraas/rest-api/pkg/validate"
+	"sync"
 	"time"
 )
 
@@ -18,6 +19,13 @@ type (
 )
 
 func (u *Usecase) Transfer(ctx context.Context, userId uint, transfer Transfer) (model.Transfer, error) {
+
+	var (
+		data  = model.Transfer{}
+		errs  = []error{}
+		wg    = sync.WaitGroup{}
+		mutex = sync.Mutex{}
+	)
 	if err := pkgvalidate.Struct(transfer); err != nil {
 		return model.Transfer{}, pkgerrors.InvalidArgument(err)
 	}
@@ -58,70 +66,93 @@ func (u *Usecase) Transfer(ctx context.Context, userId uint, transfer Transfer) 
 	balanceBeforeTarget := uBalanceTarget.CurrentBalance
 	balanceAfterTarget := balanceBeforeTarget + amount
 
+	uBalance.CurrentBalance = balanceAfter
+	uBalance.Updated = now
+
 	txRepo, err := u.repo.BeginTx()
 	if err != nil {
 		return model.Transfer{}, err
 	}
 
-	uBalance.CurrentBalance = balanceAfter
-	uBalance.Updated = now
-	err = txRepo.UpdateBalance(ctx, uBalance)
-	if err != nil {
-		errRB := txRepo.Rollback()
-		if errRB != nil {
-			return model.Transfer{}, errRB
+	wg.Add(3)
+	go func() {
+		defer wg.Done()
+		err = txRepo.UpdateBalance(ctx, uBalanceTarget)
+		if err != nil {
+			mutex.Lock()
+			errs = append(errs, err)
+			mutex.Unlock()
 		}
-		return model.Transfer{}, err
-	}
+
+	}()
 
 	uBalanceTarget.CurrentBalance = balanceAfterTarget
 	uBalanceTarget.Updated = now
-	err = txRepo.UpdateBalance(ctx, uBalanceTarget)
-	if err != nil {
-		errRB := txRepo.Rollback()
-		if errRB != nil {
-			return model.Transfer{}, errRB
-		}
-		return model.Transfer{}, err
-	}
 
-	data, err := txRepo.InsertTransfer(ctx, model.Transfer{
-		UserID:        userId,
-		Amount:        amount,
-		Remarks:       remarks,
-		BalanceBefore: balanceBefore,
-		BalanceAfter:  balanceAfter,
-		Created:       now,
-	})
-	if err != nil {
-		errRB := txRepo.Rollback()
-		if errRB != nil {
-			return model.Transfer{}, errRB
-		}
-		return model.Transfer{}, err
-	}
+	go func() {
+		defer wg.Done()
+		err = txRepo.UpdateBalance(ctx, uBalanceTarget)
+		if err != nil {
 
-	transaction := model.Transaction{
-		UserID:        userId,
-		TransferId:    &data.ID,
-		Amount:        data.Amount,
-		Remarks:       data.Remarks,
-		BalanceBefore: data.BalanceBefore,
-		BalanceAfter:  data.BalanceAfter,
-		Status:        "SUCCESS",
-		Created:       now,
-	}
-
-	transaction.MockRandType()
-	_, err = txRepo.InsertTransaction(ctx, transaction)
-	if err != nil {
-		errRB := txRepo.Rollback()
-		if errRB != nil {
-			return model.Transfer{}, errRB
+			mutex.Lock()
+			errs = append(errs, err)
+			mutex.Unlock()
 		}
-		return model.Transfer{}, err
+
+	}()
+
+	go func() {
+		defer wg.Done()
+		r, err := txRepo.InsertTransfer(ctx, model.Transfer{
+			UserID:        userId,
+			Amount:        amount,
+			Remarks:       remarks,
+			BalanceBefore: balanceBefore,
+			BalanceAfter:  balanceAfter,
+			Created:       now,
+		})
+
+		if err != nil {
+
+			mutex.Lock()
+			errs = append(errs, err)
+			mutex.Unlock()
+		}
+		data = r
+
+		transaction := model.Transaction{
+			UserID:        userId,
+			TransferId:    &data.ID,
+			Amount:        data.Amount,
+			Remarks:       data.Remarks,
+			BalanceBefore: data.BalanceBefore,
+			BalanceAfter:  data.BalanceAfter,
+			Status:        "SUCCESS",
+			Created:       now,
+		}
+
+		transaction.MockRandType()
+		_, err = txRepo.InsertTransaction(ctx, transaction)
+		if err != nil {
+
+			mutex.Lock()
+			errs = append(errs, err)
+			mutex.Unlock()
+		}
+
+	}()
+
+	wg.Wait()
+
+	if len(errs) > 0 {
+		errRollback := txRepo.Rollback()
+		if err != nil {
+			return model.Transfer{}, errRollback
+		}
+		return model.Transfer{}, errs[0]
 	}
 
 	data.UserID = 0
+
 	return data, txRepo.Commit()
 }
