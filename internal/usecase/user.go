@@ -20,7 +20,8 @@ type (
 	}
 
 	LoginResult struct {
-		Token string `json:"token"`
+		AccessToken  string `json:"access_token"`
+		RefreshToken string `json:"refresh_token"`
 	}
 )
 
@@ -118,12 +119,24 @@ func (u *Usecase) Login(ctx context.Context, login Login) (LoginResult, error) {
 	}
 
 	secret := []byte(u.config.JWTSecret)
-	token, err := pkgjwt.GenerateJWT(jwt.MapClaims{"user_id": user.ID}, secret)
+	token, err := pkgjwt.GenerateJWT(jwt.MapClaims{
+		"user_id": user.ID,
+		"sub":     1,
+		"exp":     time.Now().Add(time.Minute * 20).Unix(),
+	}, secret)
 	if err != nil {
 		return LoginResult{}, pkgerrors.Internal(err)
 	}
 
-	return LoginResult{token}, nil
+	refreshToken, err := pkgjwt.GenerateJWT(jwt.MapClaims{
+		"sub": 1,
+		"exp": time.Now().Add(time.Hour * 24).Unix(),
+	}, secret)
+	if err != nil {
+		return LoginResult{}, pkgerrors.Internal(err)
+	}
+
+	return LoginResult{token, refreshToken}, nil
 }
 
 func (usecase *Usecase) Auth(ctx context.Context, token string) (uint, error) {
