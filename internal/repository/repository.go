@@ -14,28 +14,29 @@ const (
 	Illegal         = 4
 )
 
-func New(db Db, cacher Cacher) *Repository {
+func New(db Storage, cache Cache) *Repository {
 	return &Repository{
-		Db:     db,
-		Cacher: cacher,
+		Storage: db,
+		Cache:   cache,
 	}
 }
 
 type (
 	Repository struct {
-		Db
-		Cacher
+		Storage Storage
+		Cache   Cache
 	}
-	Db interface {
-		DbWriter
+
+	Storage interface {
+		StorageWriter
 		GetUserById(ctx context.Context, userId uint) (model.User, error)
 		GetUserByPhone(ctx context.Context, phone string) (model.User, error)
 		GetBalanceByUId(ctx context.Context, userId uint) (model.Balance, error)
 		GetTransactionsByUId(ctx context.Context, userId uint) ([]model.Transaction, error)
-		BeginTx() (DbTx, error)
+		BeginTx() (Tx, error)
+		InsertTransactions(ctx context.Context, transaction []model.Transaction) error
 	}
-
-	Cacher interface {
+	Cache interface {
 		GetBalanceByUId(ctx context.Context, userId uint) (model.Balance, error)
 		GetTransactionsByUId(ctx context.Context, userId uint) ([]model.Transaction, error)
 
@@ -44,14 +45,13 @@ type (
 		//Set ttl to 0 for no expiration time.
 		InsertBalance(ctx context.Context, balance model.Balance, ttl time.Duration) error
 	}
-
-	DbTx interface {
-		DbWriter
+	Tx interface {
+		StorageWriter
 		Commit() error
 		Rollback() error
 	}
 
-	DbWriter interface {
+	StorageWriter interface {
 		InsertUser(ctx context.Context, user model.User) (model.User, error)
 		InsertBalance(ctx context.Context, balance model.Balance) error
 		InsertTopUp(ctx context.Context, topUp model.TopUp) (model.TopUp, error)

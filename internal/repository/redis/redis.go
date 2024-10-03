@@ -1,4 +1,4 @@
-package redis_repo
+package redis
 
 import (
 	"context"
@@ -10,29 +10,29 @@ import (
 	"github.com/go-redis/redis"
 )
 
-func Cacher(client *redis.Client) repository.Cacher {
-	return &cacher{client}
+func NewCache(client *redis.Client) repository.Cache {
+	return &cache{client}
 }
 
 type (
-	cacher struct {
+	cache struct {
 		*redis.Client
 	}
 )
 
-func (r *cacher) GetBalanceByUId(ctx context.Context, userId uint) (model.Balance, error) {
+func (c *cache) GetBalanceByUId(ctx context.Context, userId uint) (model.Balance, error) {
 	return model.Balance{}, pkgerrors.Unimplemented()
 }
-func (r *cacher) GetTransactionsByUId(ctx context.Context, userId uint) ([]model.Transaction, error) {
+func (c *cache) GetTransactionsByUId(ctx context.Context, userId uint) ([]model.Transaction, error) {
 	return nil, pkgerrors.Unimplemented()
 }
 
 // Set ttl to 0 for no expiration time.
-func (r *cacher) InsertTransactions(ctx context.Context, transaction []model.Transaction, ttl time.Duration) error {
+func (c *cache) InsertTransactions(ctx context.Context, transaction []model.Transaction, ttl time.Duration) error {
 	return pkgerrors.Unimplemented()
 }
 
 // Set ttl to 0 for no expiration time.
-func (r *cacher) InsertBalance(ctx context.Context, balance model.Balance, ttl time.Duration) error {
+func (c *cache) InsertBalance(ctx context.Context, balance model.Balance, ttl time.Duration) error {
 	return pkgerrors.Unimplemented()
 }

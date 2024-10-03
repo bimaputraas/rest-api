@@ -14,7 +14,7 @@ func (u *Usecase) TopUp(ctx context.Context, userId uint, amountTopUp float64) (
 		return model.TopUp{}, pkgerrors.InvalidArgument(fmt.Errorf("invalid amount"))
 	}
 
-	userBalance, err := u.repo.Db.GetBalanceByUId(ctx, userId)
+	userBalance, err := u.repo.Storage.GetBalanceByUId(ctx, userId)
 	if err != nil {
 		return model.TopUp{}, err
 	}
@@ -23,7 +23,7 @@ func (u *Usecase) TopUp(ctx context.Context, userId uint, amountTopUp float64) (
 	userBalanceAfter := userBalanceBefore + amountTopUp
 	now := time.Now().Format("2006-01-02 15:04:05")
 
-	txRepo, err := u.repo.Db.BeginTx()
+	txRepo, err := u.repo.Storage.BeginTx()
 	if err != nil {
 		return model.TopUp{}, err
 	}

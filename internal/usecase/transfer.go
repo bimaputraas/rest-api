@@ -36,7 +36,7 @@ func (u *Usecase) Transfer(ctx context.Context, userId uint, transfer Transfer) 
 	targetUid := transfer.TargetUser
 	now := time.Now().Format(time.DateTime)
 
-	_, err := u.repo.Db.GetUserById(ctx, targetUid)
+	_, err := u.repo.Storage.GetUserById(ctx, targetUid)
 	if pkgerrors.Code(err) == pkgerrors.ErrNotFound {
 		return model.Transfer{}, pkgerrors.InvalidArgument(fmt.Errorf("target user is not exist"))
 	}
@@ -48,7 +48,7 @@ func (u *Usecase) Transfer(ctx context.Context, userId uint, transfer Transfer) 
 		return model.Transfer{}, pkgerrors.InvalidArgument(fmt.Errorf("invalid amount"))
 	}
 
-	userBalance, err := u.repo.Db.GetBalanceByUId(ctx, userId)
+	userBalance, err := u.repo.Storage.GetBalanceByUId(ctx, userId)
 	if err != nil {
 		return model.Transfer{}, err
 	}
@@ -59,7 +59,7 @@ func (u *Usecase) Transfer(ctx context.Context, userId uint, transfer Transfer) 
 		return model.Transfer{}, pkgerrors.InvalidArgument(fmt.Errorf("balance is not enough"))
 	}
 
-	targetBalance, err := u.repo.Db.GetBalanceByUId(ctx, targetUid)
+	targetBalance, err := u.repo.Storage.GetBalanceByUId(ctx, targetUid)
 	if err != nil {
 		return model.Transfer{}, err
 	}
@@ -70,7 +70,7 @@ func (u *Usecase) Transfer(ctx context.Context, userId uint, transfer Transfer) 
 	userBalance.CurrentBalance = userBalanceAfter
 	userBalance.Updated = now
 
-	txRepo, err := u.repo.Db.BeginTx()
+	txRepo, err := u.repo.Storage.BeginTx()
 	if err != nil {
 		return model.Transfer{}, err
 	}

@@ -27,7 +27,7 @@ func (u *Usecase) Payment(ctx context.Context, userId uint, payment Payment) (mo
 		return model.Payment{}, pkgerrors.InvalidArgument(fmt.Errorf("invalid amount"))
 	}
 
-	userBalance, err := u.repo.Db.GetBalanceByUId(ctx, userId)
+	userBalance, err := u.repo.Storage.GetBalanceByUId(ctx, userId)
 	if err != nil {
 		return model.Payment{}, err
 	}
@@ -40,7 +40,7 @@ func (u *Usecase) Payment(ctx context.Context, userId uint, payment Payment) (mo
 		return model.Payment{}, pkgerrors.InvalidArgument(fmt.Errorf("balance is not enough"))
 	}
 
-	txRepo, err := u.repo.Db.BeginTx()
+	txRepo, err := u.repo.Storage.BeginTx()
 	if err != nil {
 		return model.Payment{}, err
 	}

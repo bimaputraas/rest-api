@@ -8,8 +8,8 @@ import (
 	"github.com/bimaputraas/rest-api/internal/api/routes"
 	"github.com/bimaputraas/rest-api/internal/config"
 	"github.com/bimaputraas/rest-api/internal/repository"
-	gorm_repo "github.com/bimaputraas/rest-api/internal/repository/gorm"
-	redis_repo "github.com/bimaputraas/rest-api/internal/repository/redis"
+	gormRepository "github.com/bimaputraas/rest-api/internal/repository/gorm"
+	redisRepository "github.com/bimaputraas/rest-api/internal/repository/redis"
 	"github.com/bimaputraas/rest-api/internal/usecase"
 	"github.com/go-redis/redis"
 	"gorm.io/driver/mysql"
@@ -29,7 +29,7 @@ func main() {
 
 	redisClient := &redis.Client{}
 
-	uc := usecase.New(repository.New(gorm_repo.Db(gormDB), redis_repo.Cacher(redisClient)), cfg)
+	uc := usecase.New(repository.New(gormRepository.NewStorage(gormDB), redisRepository.NewCache(redisClient)), cfg)
 
 	r := routes.New(middleware.New(uc), controller.New(uc))
 
