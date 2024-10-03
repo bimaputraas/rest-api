@@ -4,13 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
+
 	"github.com/bimaputraas/rest-api/internal/model"
 	pkgerrors "github.com/bimaputraas/rest-api/pkg/errors"
 	pkghash "github.com/bimaputraas/rest-api/pkg/hash"
 	pkgjwt "github.com/bimaputraas/rest-api/pkg/jwt"
 	pkgvalidate "github.com/bimaputraas/rest-api/pkg/validate"
 	"github.com/golang-jwt/jwt/v5"
-	"time"
 )
 
 type (
@@ -30,7 +31,7 @@ func (u *Usecase) Register(ctx context.Context, user model.User) (model.User, er
 		return model.User{}, pkgerrors.InvalidArgument(err)
 	}
 
-	uCheck, err := u.repo.GetUserByPhone(ctx, user.PhoneNumber)
+	uCheck, err := u.repo.Db.GetUserByPhone(ctx, user.PhoneNumber)
 	if err != nil {
 		if pkgerrors.Code(err) != pkgerrors.ErrNotFound {
 			return model.User{}, err
@@ -56,7 +57,7 @@ func (u *Usecase) Register(ctx context.Context, user model.User) (model.User, er
 
 	user.Pin = hashed
 	user.Created = time.Now().Format(time.DateTime)
-	txRepo, err := u.repo.BeginTx()
+	txRepo, err := u.repo.Db.BeginTx()
 	if err != nil {
 		return model.User{}, err
 	}
@@ -104,7 +105,7 @@ func (u *Usecase) Login(ctx context.Context, login Login) (LoginResult, error) {
 
 	plain = login.Pin
 
-	user, err := u.repo.GetUserByPhone(ctx, login.PhoneNumber)
+	user, err := u.repo.Db.GetUserByPhone(ctx, login.PhoneNumber)
 	if err != nil {
 		if pkgerrors.Code(err) == pkgerrors.ErrNotFound {
 			return LoginResult{}, pkgerrors.InvalidArgument(fmt.Errorf("invalid phone or pin"))
@@ -155,7 +156,7 @@ func (usecase *Usecase) Auth(ctx context.Context, token string) (uint, error) {
 		return 0, pkgerrors.Internal(errors.New("failed assert"))
 	}
 
-	user, err := usecase.repo.GetUserById(ctx, uint(userId))
+	user, err := usecase.repo.Db.GetUserById(ctx, uint(userId))
 	if err != nil {
 		if pkgerrors.Code(err) == pkgerrors.ErrNotFound {
 			return 0, pkgerrors.Illegal(fmt.Errorf("unauthenticated"))

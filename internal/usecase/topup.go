@@ -3,9 +3,10 @@ package usecase
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/bimaputraas/rest-api/internal/model"
 	pkgerrors "github.com/bimaputraas/rest-api/pkg/errors"
-	"time"
 )
 
 func (u *Usecase) TopUp(ctx context.Context, userId uint, amountTopUp float64) (model.TopUp, error) {
@@ -13,23 +14,23 @@ func (u *Usecase) TopUp(ctx context.Context, userId uint, amountTopUp float64) (
 		return model.TopUp{}, pkgerrors.InvalidArgument(fmt.Errorf("invalid amount"))
 	}
 
-	uBalance, err := u.repo.GetBalanceByUId(ctx, userId)
+	userBalance, err := u.repo.Db.GetBalanceByUId(ctx, userId)
 	if err != nil {
 		return model.TopUp{}, err
 	}
 
-	balanceBefore := uBalance.CurrentBalance
-	balanceAfter := balanceBefore + amountTopUp
+	userBalanceBefore := userBalance.CurrentBalance
+	userBalanceAfter := userBalanceBefore + amountTopUp
 	now := time.Now().Format("2006-01-02 15:04:05")
 
-	txRepo, err := u.repo.BeginTx()
+	txRepo, err := u.repo.Db.BeginTx()
 	if err != nil {
 		return model.TopUp{}, err
 	}
 
-	uBalance.CurrentBalance = balanceAfter
-	uBalance.Updated = now
-	err = txRepo.UpdateBalance(ctx, uBalance)
+	userBalance.CurrentBalance = userBalanceAfter
+	userBalance.Updated = now
+	err = txRepo.UpdateBalance(ctx, userBalance)
 	if err != nil {
 		errRB := txRepo.Rollback()
 		if errRB != nil {
@@ -41,8 +42,8 @@ func (u *Usecase) TopUp(ctx context.Context, userId uint, amountTopUp float64) (
 	data, err := txRepo.InsertTopUp(ctx, model.TopUp{
 		UserID:        userId,
 		AmountTopUp:   amountTopUp,
-		BalanceBefore: balanceBefore,
-		BalanceAfter:  balanceAfter,
+		BalanceBefore: userBalanceBefore,
+		BalanceAfter:  userBalanceAfter,
 		Created:       now,
 	})
 

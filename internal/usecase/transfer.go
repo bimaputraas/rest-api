@@ -3,11 +3,12 @@ package usecase
 import (
 	"context"
 	"fmt"
+	"sync"
+	"time"
+
 	"github.com/bimaputraas/rest-api/internal/model"
 	pkgerrors "github.com/bimaputraas/rest-api/pkg/errors"
 	pkgvalidate "github.com/bimaputraas/rest-api/pkg/validate"
-	"sync"
-	"time"
 )
 
 type (
@@ -35,7 +36,7 @@ func (u *Usecase) Transfer(ctx context.Context, userId uint, transfer Transfer) 
 	targetUid := transfer.TargetUser
 	now := time.Now().Format(time.DateTime)
 
-	_, err := u.repo.GetUserById(ctx, targetUid)
+	_, err := u.repo.Db.GetUserById(ctx, targetUid)
 	if pkgerrors.Code(err) == pkgerrors.ErrNotFound {
 		return model.Transfer{}, pkgerrors.InvalidArgument(fmt.Errorf("target user is not exist"))
 	}
@@ -47,29 +48,29 @@ func (u *Usecase) Transfer(ctx context.Context, userId uint, transfer Transfer) 
 		return model.Transfer{}, pkgerrors.InvalidArgument(fmt.Errorf("invalid amount"))
 	}
 
-	uBalance, err := u.repo.GetBalanceByUId(ctx, userId)
+	userBalance, err := u.repo.Db.GetBalanceByUId(ctx, userId)
 	if err != nil {
 		return model.Transfer{}, err
 	}
 
-	balanceBefore := uBalance.CurrentBalance
-	balanceAfter := balanceBefore - amount
-	if balanceAfter < 0 {
+	userBalanceBefore := userBalance.CurrentBalance
+	userBalanceAfter := userBalanceBefore - amount
+	if userBalanceAfter < 0 {
 		return model.Transfer{}, pkgerrors.InvalidArgument(fmt.Errorf("balance is not enough"))
 	}
 
-	uBalanceTarget, err := u.repo.GetBalanceByUId(ctx, targetUid)
+	targetBalance, err := u.repo.Db.GetBalanceByUId(ctx, targetUid)
 	if err != nil {
 		return model.Transfer{}, err
 	}
 
-	balanceBeforeTarget := uBalanceTarget.CurrentBalance
-	balanceAfterTarget := balanceBeforeTarget + amount
+	targetBalanceBefore := targetBalance.CurrentBalance
+	targetBalanceAfter := targetBalanceBefore + amount
 
-	uBalance.CurrentBalance = balanceAfter
-	uBalance.Updated = now
+	userBalance.CurrentBalance = userBalanceAfter
+	userBalance.Updated = now
 
-	txRepo, err := u.repo.BeginTx()
+	txRepo, err := u.repo.Db.BeginTx()
 	if err != nil {
 		return model.Transfer{}, err
 	}
@@ -77,7 +78,7 @@ func (u *Usecase) Transfer(ctx context.Context, userId uint, transfer Transfer) 
 	wg.Add(3)
 	go func() {
 		defer wg.Done()
-		err = txRepo.UpdateBalance(ctx, uBalanceTarget)
+		err = txRepo.UpdateBalance(ctx, userBalance)
 		if err != nil {
 			mutex.Lock()
 			errs = append(errs, err)
@@ -86,12 +87,12 @@ func (u *Usecase) Transfer(ctx context.Context, userId uint, transfer Transfer) 
 
 	}()
 
-	uBalanceTarget.CurrentBalance = balanceAfterTarget
-	uBalanceTarget.Updated = now
+	targetBalance.CurrentBalance = targetBalanceAfter
+	targetBalance.Updated = now
 
 	go func() {
 		defer wg.Done()
-		err = txRepo.UpdateBalance(ctx, uBalanceTarget)
+		err = txRepo.UpdateBalance(ctx, targetBalance)
 		if err != nil {
 
 			mutex.Lock()
@@ -107,8 +108,8 @@ func (u *Usecase) Transfer(ctx context.Context, userId uint, transfer Transfer) 
 			UserID:        userId,
 			Amount:        amount,
 			Remarks:       remarks,
-			BalanceBefore: balanceBefore,
-			BalanceAfter:  balanceAfter,
+			BalanceBefore: userBalanceBefore,
+			BalanceAfter:  userBalanceAfter,
 			Created:       now,
 		})
 

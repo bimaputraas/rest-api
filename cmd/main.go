@@ -1,15 +1,19 @@
 package main
 
 import (
+	"log"
+
 	"github.com/bimaputraas/rest-api/internal/api/controller"
 	"github.com/bimaputraas/rest-api/internal/api/middleware"
 	"github.com/bimaputraas/rest-api/internal/api/routes"
 	"github.com/bimaputraas/rest-api/internal/config"
-	"github.com/bimaputraas/rest-api/internal/repository/mysql"
+	"github.com/bimaputraas/rest-api/internal/repository"
+	gorm_repo "github.com/bimaputraas/rest-api/internal/repository/gorm"
+	redis_repo "github.com/bimaputraas/rest-api/internal/repository/redis"
 	"github.com/bimaputraas/rest-api/internal/usecase"
-	_ "github.com/bimaputraas/rest-api/pkg/database"
-	pkgdatabase "github.com/bimaputraas/rest-api/pkg/database"
-	"log"
+	"github.com/go-redis/redis"
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
 )
 
 func main() {
@@ -18,16 +22,16 @@ func main() {
 		log.Fatal(err)
 	}
 
-	db, err := pkgdatabase.NewGorm(cfg.MySQLURI)
+	gormDB, err := gorm.Open(mysql.Open(cfg.MySQLURI), &gorm.Config{})
 	if err != nil {
 		log.Fatal(err)
 	}
-	repo := mysql.New(db)
-	uc := usecase.New(repo, cfg)
-	mw := middleware.New(uc)
-	ctr := controller.New(uc)
 
-	r := routes.New(mw, ctr)
+	redisClient := &redis.Client{}
+
+	uc := usecase.New(repository.New(gorm_repo.Db(gormDB), redis_repo.Cacher(redisClient)), cfg)
+
+	r := routes.New(middleware.New(uc), controller.New(uc))
 
 	log.Fatal(r.Run(":8080"))
 }

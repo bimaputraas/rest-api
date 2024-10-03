@@ -7,12 +7,12 @@ import (
 
 type (
 	Usecase struct {
-		repo   repository.Repository
+		repo   *repository.Repository
 		config *config.Config
 	}
 )
 
-func New(repo repository.Repository, config *config.Config) *Usecase {
+func New(repo *repository.Repository, config *config.Config) *Usecase {
 	return &Usecase{
 		repo:   repo,
 		config: config,

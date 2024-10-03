@@ -3,10 +3,11 @@ package usecase
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/bimaputraas/rest-api/internal/model"
 	pkgerrors "github.com/bimaputraas/rest-api/pkg/errors"
 	pkgvalidate "github.com/bimaputraas/rest-api/pkg/validate"
-	"time"
 )
 
 type (
@@ -26,27 +27,27 @@ func (u *Usecase) Payment(ctx context.Context, userId uint, payment Payment) (mo
 		return model.Payment{}, pkgerrors.InvalidArgument(fmt.Errorf("invalid amount"))
 	}
 
-	uBalance, err := u.repo.GetBalanceByUId(ctx, userId)
+	userBalance, err := u.repo.Db.GetBalanceByUId(ctx, userId)
 	if err != nil {
 		return model.Payment{}, err
 	}
 
-	balanceBefore := uBalance.CurrentBalance
-	balanceAfter := balanceBefore - amount
+	userBalanceBefore := userBalance.CurrentBalance
+	userBalanceAfter := userBalanceBefore - amount
 	now := time.Now().Format(time.DateTime)
 
-	if balanceAfter < 0 {
+	if userBalanceAfter < 0 {
 		return model.Payment{}, pkgerrors.InvalidArgument(fmt.Errorf("balance is not enough"))
 	}
 
-	txRepo, err := u.repo.BeginTx()
+	txRepo, err := u.repo.Db.BeginTx()
 	if err != nil {
 		return model.Payment{}, err
 	}
 
-	uBalance.CurrentBalance = balanceAfter
-	uBalance.Updated = now
-	err = txRepo.UpdateBalance(ctx, uBalance)
+	userBalance.CurrentBalance = userBalanceAfter
+	userBalance.Updated = now
+	err = txRepo.UpdateBalance(ctx, userBalance)
 	if err != nil {
 		errRB := txRepo.Rollback()
 		if errRB != nil {
@@ -59,8 +60,8 @@ func (u *Usecase) Payment(ctx context.Context, userId uint, payment Payment) (mo
 		UserID:        userId,
 		Amount:        amount,
 		Remarks:       remarks,
-		BalanceBefore: balanceBefore,
-		BalanceAfter:  balanceAfter,
+		BalanceBefore: userBalanceBefore,
+		BalanceAfter:  userBalanceAfter,
 		Created:       now,
 	})
 
